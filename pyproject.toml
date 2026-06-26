@@ -1,0 +1,35 @@
+[project]
+name = "lwmf"
+version = "0.1.0"
+description = "Language World Model forgetting experiment harness"
+requires-python = ">=3.11"
+# Core deps: enough to import every module and run the offline unit suite.
+# All heavy GPU-only libs live in the [gpu] extra so local (macOS, no CUDA)
+# installs don't choke on bitsandbytes.
+dependencies = [
+  "torch>=2.3",
+  "transformers>=4.44",
+  "datasets>=2.20",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+# Installed only on the Azure T4 VM (training + lm-eval). bitsandbytes has no
+# macOS CUDA wheel — keep it out of the local install.
+gpu = ["trl>=0.9", "peft>=0.12", "accelerate>=0.33", "bitsandbytes>=0.43", "lm-eval>=0.4.3"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+  "smoke: end-to-end checks that download models / use GPU (deselect with -m 'not smoke')",
+  "gpu: requires CUDA",
+]
+addopts = "-m 'not smoke and not gpu'"
+testpaths = ["tests"]
