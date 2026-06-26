@@ -69,20 +69,21 @@ name = "lwmf"
 version = "0.1.0"
 description = "Language World Model forgetting experiment harness"
 requires-python = ">=3.11"
+# Core deps: enough to import every module and run the offline unit suite.
+# All heavy GPU-only libs live in the [gpu] extra so local (macOS, no CUDA)
+# installs don't choke on bitsandbytes.
 dependencies = [
-  "transformers>=4.44",
-  "trl>=0.9",
-  "peft>=0.12",
-  "datasets>=2.20",
-  "accelerate>=0.33",
-  "bitsandbytes>=0.43",
   "torch>=2.3",
+  "transformers>=4.44",
+  "datasets>=2.20",
   "pyyaml>=6.0",
-  "lm-eval>=0.4.3",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Installed only on the Azure T4 VM (training + lm-eval). bitsandbytes has no
+# macOS CUDA wheel — keep it out of the local install.
+gpu = ["trl>=0.9", "peft>=0.12", "accelerate>=0.33", "bitsandbytes>=0.43", "lm-eval>=0.4.3"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -118,11 +119,11 @@ def test_package_imports():
 
 - [ ] **Step 3: Create venv and install (editable)**
 
-Run:
+Run (local dev machine — core + pytest only, no GPU libs):
 ```bash
 python3.11 -m venv .venv && . .venv/bin/activate && pip install -U pip && pip install -e ".[dev]"
 ```
-Expected: installs without error. (On the dev machine without GPU, `bitsandbytes`/`torch` CPU wheels are fine; GPU wheels installed on the Azure VM.)
+Expected: installs without error (torch CPU wheel on macOS is fine). On the Azure T4 VM the install is `pip install -e ".[dev,gpu]"` (adds trl/peft/accelerate/bitsandbytes/lm-eval).
 
 - [ ] **Step 4: Run the test**
 
@@ -1547,7 +1548,7 @@ az group create -n lwmf-rg -l australiaeast
 az vm create -g lwmf-rg -n lwmf-t4 --image Ubuntu2204 \
   --size Standard_NC4as_T4_v3 --priority Spot --max-price -1 \
   --eviction-policy Deallocate --admin-username azureuser --generate-ssh-keys
-# ssh in, install CUDA driver + python3.11, clone repo, pip install -e ".[dev]"
+# ssh in, install CUDA driver + python3.11, clone repo, pip install -e ".[dev,gpu]"
 # verify: python -c "import torch; print(torch.cuda.is_available())"  -> True
 ```
 
