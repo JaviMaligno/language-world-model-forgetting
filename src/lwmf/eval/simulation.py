@@ -35,8 +35,13 @@ def eval_simulation(model, tokenizer, trajs, max_new_tokens: int = 128) -> dict:
         for ex in expand_to_turns(traj):
             ids = tokenizer.apply_chat_template(
                 ex.prefix_messages, tokenize=True, add_generation_prompt=True,
-                return_tensors="pt",
-            ).to(model.device)
+                return_tensors="pt", return_dict=False,
+            )
+            # Some transformers versions return a BatchEncoding/dict even with
+            # return_dict=False; normalize to the input_ids tensor.
+            if isinstance(ids, dict):
+                ids = ids["input_ids"]
+            ids = ids.to(model.device)
             with torch.no_grad():
                 out = model.generate(ids, max_new_tokens=max_new_tokens,
                                      do_sample=False,
@@ -44,5 +49,7 @@ def eval_simulation(model, tokenizer, trajs, max_new_tokens: int = 128) -> dict:
             pred = tokenizer.decode(out[0, ids.shape[1]:], skip_special_tokens=True)
             ems.append(1.0 if exact_match(pred, ex.target) else 0.0)
             f1s.append(token_f1(pred, ex.target))
+    if not ems:
+        return {"sim_em": 0.0, "sim_f1": 0.0, "n": 0}
     return {"sim_em": sum(ems) / len(ems), "sim_f1": sum(f1s) / len(f1s),
             "n": len(ems)}
