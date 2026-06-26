@@ -1,4 +1,3 @@
-import os
 from lwmf.data.sandbox import run_in_sandbox
 
 def test_state_persists_and_isolated(tmp_path):
