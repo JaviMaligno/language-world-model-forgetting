@@ -64,6 +64,11 @@ queda sin cuantificar. Lo cuantificamos.
 El cruce completo (4×2×2×2 × LR × seeds) es inviable en una sola T4. Se ejecuta **por
 fases**, dejando que la señal observada decida qué ejes merece profundizar.
 
+**Eje v2 (opcional, según resultados):** *naturaleza del replay*. La v1 usa replay de
+**texto plano** (preserva conocimiento, probablemente NO instruction-following). La v2
+añade replay de **datos de instrucción** (formato chat) para testar si esa palanca recupera
+el instruction-following que el texto plano no salva. Ver Fase 4 y §5.3.
+
 ## 4. Plan por fases
 
 ### Fase 0 — Harness + sanity (sin claims)
@@ -91,6 +96,12 @@ Solo los ejes que la Fase 1 sugiera jugosos:
 Scatter de **ganancia-en-entorno** (accuracy de simulación) vs **pérdida-general** (Δ
 conocimiento) sobre todas las corridas → frontera de Pareto.
 
+### Fase 4 — Naturaleza del replay (v2, opcional)
+Solo si la Fase 1+ muestra que el modelo Instruct pierde instruction-following que el replay
+de texto plano no recupera. Repetir la curva de mixing pero con el corpus de replay siendo
+**datos de instrucción** (chat) en vez de texto plano. Pregunta: ¿qué palanca de replay
+recupera qué capacidad? (texto → conocimiento; instrucción → IF). Comparar contra la v1.
+
 ## 5. Datos
 
 ### 5.1 Trayectorias de entorno (dominio Terminal)
@@ -108,24 +119,63 @@ conocimiento) sobre todas las corridas → frontera de Pareto.
   de acción (`user`) se enmascaran (siguen en el forward como contexto, no contribuyen al
   gradiente). Réplica ligera del *information masking* del paper. (Opcional: filtrar turnos
   donde el estado no cambia para no enseñar a copiar.)
-- **Tamaño objetivo:** ~2–5k turnos.
+- **Tamaño:** lo que importa para el olvido son **pasos × LR sobre datos estrechos**, no el
+  nº de turnos. Dimensionado: **~25–30k turnos ≈ ~8–10M tokens** (el generador los produce
+  barato), split 90/10 train/held-out. Esto permite entrenar ~1–3 épocas sin caer en
+  sobre-epocheo patológico (decenas de épocas memorizarían y contaminarían el resultado).
 
-### 5.2 Corpus general (replay para mixing)
-- Slice de un corpus abierto general (FineWeb-Edu / Cosmopedia / wiki) como datos
-  **single-turn** bajo el mismo objetivo de next-token. Se intercala con las trayectorias en
-  el ratio correspondiente. Es la palanca anti-olvido clásica (rehearsal/replay).
+### 5.2 Corpus general (replay v1: texto plano)
+- **Elegido: FineWeb-Edu.** Web filtrada por calidad educativa, moderno, rico en
+  conocimiento, ampliamente usado y citable. Mejor proxy disponible de la distribución de
+  pre-entrenamiento original (la mezcla exacta de Qwen no es pública). Datos **single-turn**
+  bajo el mismo objetivo de next-token; se intercala con las trayectorias en el ratio
+  correspondiente. Palanca anti-olvido clásica (rehearsal/replay). Se streamea de HF
+  (~ilimitado; al 50% del presupuesto se necesitan ~5M tokens).
+- **Banco de alternativas (no usadas de primeras, anotadas por si sirven):**
+  - *Cosmopedia* — sintético tipo libro de texto; útil si queremos densidad de conocimiento
+    estructurado, pero distribución sintética menos representativa.
+  - *WikiText-103 / Wikipedia* — enciclopédico; OJO solapa con el *conocimiento* de
+    MMLU/TriviaQA (no es train-on-test, pero ensucia la narrativa de "replay general").
+  - *C4 / Dolma slice* — web genérica más amplia y ruidosa; alternativa si FineWeb-Edu
+    resulta demasiado estrecha hacia lo educativo.
+
+### 5.3 Corpus de instrucción (replay v2: chat) — opcional
+- Para la Fase 4. Datos de instrucción abiertos en formato chat (p. ej. una mezcla tipo
+  Tulu/OpenHermes/UltraChat — fijar el dataset exacto en el plan). Objetivo: testar si el
+  replay de *instrucción* recupera el instruction-following que el texto plano no salva.
+
+### 5.4 Presupuesto de entrenamiento (constante entre condiciones)
+- **Clave del diseño limpio:** fijar el presupuesto de **tokens/pasos idéntico** en todas
+  las celdas del barrido. El mixing **sustituye** fracción de tokens estrechos por generales
+  (no añade encima) → el olvido es atribuible a la *distribución*, no a más cómputo.
+- Punto de partida: ~1 época del dato estrecho al 0% ≈ ~8M tokens ≈ **~500 pasos** (seq
+  1024, batch efectivo ~16). Barrer hasta 2–3 épocas. Congelado e idéntico salvo el eje que
+  se estudia.
 
 ## 6. Evaluación y métricas
 
 Medir **antes** (modelo intacto) y **después** de cada corrida. Todo lo demás congelado
 entre corridas de un mismo barrido.
 
-| Dimensión | Instrumento | Métrica |
+**Herramienta:** **EleutherAI lm-evaluation-harness** para TODO lo estándar (no subsets
+caseros — añaden varianza y restan defensibilidad; el harness hace el loglikelihood scoring
+correctamente, es el estándar citable, y en T4 con 0.5B los MC tardan minutos). Harness
+custom **solo** para la tarea Terminal.
+
+**Criterio de selección de instrumentos:** evitar el *suelo aleatorio*. En modelos 0.5–1.5B
+muchos benchmarks ya están a random → sin rango para medir caída. Elegidos por tener el
+baseline claramente por encima del suelo (con Qwen2.5, que es fuerte para su tamaño: 0.5B
+≈45% MMLU, 1.5B ≈60%).
+
+| Dimensión | Instrumento | Por qué / nota |
 |---|---|---|
-| Conocimiento | subset MMLU (~cientos Q), ARC-easy/challenge, factual QA | accuracy; Δ vs baseline |
-| Modelado de lenguaje general | perplexity en texto general held-out | perplexity; Δ |
-| Instruction-following (solo Instruct) | batería mini de formato/seguimiento | tasa de cumplimiento; Δ |
-| Tarea aprendida (¿simula?) | trayectorias Terminal held-out | exact-match + fuzzy (token-F1 / edit normalizado) de la siguiente observación |
+| **Canario continuo** | Perplexity en held-out general (WikiText-103 + slice C4) | Continuo, **sin suelo** → detector de drift más sensible |
+| **Conocimiento factual** | TriviaQA closed-book (EM) | Mide *recall* de hechos = lo que se sobreescribe; el más directo para el titular. Generativo (más lento) |
+| **Conocimiento académico** | MMLU (loglikelihood) | El benchmark que el paper omite; con Qwen hay recorrido; rápido |
+| **Razonamiento/ciencia** | ARC-easy + ARC-challenge | Buen rango; estándar |
+| **Sentido común** | HellaSwag + WinoGrande | Robustos, baseline muy sobre el suelo |
+| **Instruction-following** (solo Instruct) | IFEval | Instrucciones verificables por programa → **determinista, sin LLM-juez** |
+| **Tarea aprendida** (¿simula?) | Terminal held-out: EM + token-F1 / edit normalizado | Gate de validez: si no aprendió, el olvido no se interpreta |
 
 **Derivadas:**
 - **Olvido** = caída en las métricas generales (knowledge + perplexity + IF).
@@ -137,25 +187,57 @@ entre corridas de un mismo barrido.
   nada).
 - Barrer ≥2 LR para no confundir un artefacto de un solo hiperparámetro con un hallazgo.
 
-## 7. Infraestructura
+## 7. Testing y validez experimental
+
+Tres capas. (Lección de CWM: un bug de medición —timeout del sandbox → acuerdo 0 espurio—
+casi produce un hallazgo falso. El análogo aquí, y el bug más peligroso, es el **loss
+masking mal puesto**: enmascarar los tokens equivocados entrena otra cosa e invalida todo
+sin avisar.)
+
+**Capa A — Tests unitarios (código correcto):**
+- **Máscara de pérdida (test #1, el crux):** el tensor de labels enmascara *exactamente* los
+  tokens de acción/`user` y conserva los de observación.
+- Expansión trayectoria-a-turno produce los `(input, target)` correctos; chat template y
+  tokenización round-trip.
+- El sampler de mixing produce el ratio pedido (ratio empírico sobre N batches ≈ objetivo).
+- Generador Terminal: aislamiento del sandbox (no escapar del scratch dir), reproducibilidad.
+
+**Capa B — Gates de validez experimental (el resultado *significa* algo):**
+1. **Reproducción del baseline (gate maestro):** los números intactos de Qwen2.5 deben
+   coincidir con el tech report de Qwen (±tolerancia). Si no, el harness está mal → valida
+   todo el aparato de medición contra verdad publicada.
+2. **Check de aprendizaje:** la accuracy de simulación held-out **debe subir** vs baseline; si
+   no, el olvido no se interpreta.
+3. **Overfit-one-batch:** un batch diminuto → loss→~0 confirma que el gradiente fluye a los
+   tokens correctos.
+4. **Control negativo:** 100% replay / 0% terminal → debe dar ~0 olvido y ~0 aprendizaje.
+5. **Sin fuga train/test:** datos Terminal sintéticos disjuntos de los benchmarks; replay
+   disjunto de los *items* de eval (spot-check).
+6. **Determinismo:** misma seed → mismo resultado (re-correr una celda).
+
+**Capa C — Estadística:** 3 seeds + intervalos de confianza en la curva titular; el barrido
+de ≥2 LR es además test de robustez (que el hallazgo no sea artefacto de un hiperparámetro).
+
+## 8. Infraestructura
 
 - **Compute:** Azure `Standard_NC4as_T4_v3` **spot** en `australiaeast` (1× T4, 16 GB VRAM).
   Verificado 2026-06-25: subscription "Simple KYC Sandbox" tiene cuota NCASv3_T4 = 10 vCPUs
   y 50 vCPUs de low-priority en australiaeast (misma región que el Azure OpenAI existente).
-- **Stack:** HuggingFace `transformers` + `trl` (SFT/CPT) + `peft` (LoRA). fp16 (T4 no tiene
-  bf16). Gradient checkpointing + optimizador 8-bit (bitsandbytes) para que 1.5B full-FT
-  entre en 16 GB.
+- **Stack:** HuggingFace `transformers` + `trl` (SFT/CPT) + `peft` (LoRA) para entrenar;
+  **`lm-evaluation-harness`** para los evals estándar. fp16 (T4 no tiene bf16). Gradient
+  checkpointing + optimizador 8-bit (bitsandbytes) para que 1.5B full-FT entre en 16 GB.
+  Collator custom con loss-masking sobre tokens de observación (el crux — ver §7).
 - **Reproducibilidad:** seeds fijas; LR, pasos y eval set **congelados** entre corridas de
   mixing; versionar dataset, configs y resultados.
 - **Repo:** `language-world-model-forgetting` (privado, espejo de `code-world-models`).
   Resultados a `docs/EXPERIMENTS.md`.
 
-## 8. Modelos
+## 9. Modelos
 
 - **Familia:** Qwen2.5 — `Qwen2.5-0.5B`, `Qwen2.5-0.5B-Instruct`, `Qwen2.5-1.5B`,
   `Qwen2.5-1.5B-Instruct`. Pesos abiertos, tamaños que caben en T4, family bien soportada.
 
-## 9. Honestidad / límites (para el artículo)
+## 10. Honestidad / límites (para el artículo)
 
 - Escala de juguete ≠ prueba sobre los 35B/397B del paper. Estudiamos **la dinámica**, que
   aparece (más pronunciada) en modelos pequeños.
@@ -164,7 +246,7 @@ entre corridas de un mismo barrido.
 - El paper no mide la retención; nosotros no afirmamos que ellos tengan olvido, solo que la
   pregunta queda abierta y la cerramos a escala controlada.
 
-## 10. Conexión con la serie del blog
+## 11. Conexión con la serie del blog
 
 Tercer artículo, espejo del de **deuda cognitiva** ("How Much Should You Still Know?") pero
 del lado del *modelo*: ¿qué olvida un modelo cuando le enseñas a simular el mundo? Hermano
