@@ -17,6 +17,8 @@ def test_deltas_negative_is_forgetting():
 
 def test_save_record(tmp_path):
     p = save_record(make(), str(tmp_path))
+    import os
+    assert os.path.basename(p) == "t0-seed0.json"
     loaded = json.loads(open(p).read())
     assert loaded["config"]["name"] == "t0"
     assert loaded["after"]["mmlu"] == 0.38

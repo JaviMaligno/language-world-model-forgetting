@@ -29,8 +29,8 @@ def save_record(record: ResultRecord, results_dir: str) -> str:
 
 def append_experiments_md(record: ResultRecord, d: dict, md_path: str) -> None:
     c = record.config
-    row = (f"| {c.get('name')} | {c.get('mixing_ratio')} | {c.get('method')} | "
-           f"{c.get('seed')} | {record.sim_after.get('sim_em'):.3f} | "
+    row = (f"| {c.get('name', '')} | {c.get('mixing_ratio', '')} | {c.get('method', '')} | "
+           f"{c.get('seed', '')} | {record.sim_after.get('sim_em', float('nan')):.3f} | "
            f"{d.get('mmlu', float('nan')):+.3f} | {d.get('triviaqa', float('nan')):+.3f} |\n")
     header = ("| run | mix | method | seed | sim_em | Δmmlu | Δtrivia |\n"
               "|---|---|---|---|---|---|---|\n")
