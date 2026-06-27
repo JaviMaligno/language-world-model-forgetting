@@ -37,16 +37,18 @@ def train(config: TrainConfig, terminal_path: str, out_dir: str) -> str:
         replay_examples = build_replay_examples(
             load_replay_stream(config.replay_dataset), tok,
             config.seq_len, needed_replay)
-    mixed = mixed_iterator(narrow,
-                           itertools.cycle(replay_examples) if replay_examples else iter(()),
-                           config.mixing_ratio,
-                           config.seed)
+
+    def _make_mixed():
+        replay_iter = (
+            itertools.cycle(replay_examples) if replay_examples else iter(())
+        )
+        return mixed_iterator(narrow, replay_iter, config.mixing_ratio, config.seed)
 
     collator = MaskedSFTCollator(tok, max_len=config.seq_len)
 
     class StreamDS(IterableDataset):
         def __iter__(self):
-            return mixed
+            return _make_mixed()
 
     model = AutoModelForCausalLM.from_pretrained(
         config.base_model, torch_dtype=torch.float16)
