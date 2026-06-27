@@ -8,3 +8,4 @@ data/raw/
 *.bin
 wandb/
 .env
+*.egg-info/
