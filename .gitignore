@@ -9,3 +9,4 @@ data/raw/
 wandb/
 .env
 *.egg-info/
+.superpowers/
