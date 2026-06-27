@@ -1,0 +1,10 @@
+name: p1_05Bi_mix50
+base_model: Qwen/Qwen2.5-0.5B-Instruct
+method: full
+mixing_ratio: 0.50
+lr: 1.0e-5
+max_steps: 500
+batch_size: 4
+grad_accum: 4
+seed: 0
+is_instruct: true
