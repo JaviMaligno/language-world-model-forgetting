@@ -42,7 +42,7 @@ def perplexity(model, tokenizer, texts: list[str], stride: int = 512) -> float:
     import torch, math
     enc = tokenizer("\n\n".join(texts), return_tensors="pt").input_ids.to(model.device)
     nlls, count = [], 0
-    for i in range(0, enc.size(1) - 1, stride):
+    for i in range(0, enc.size(1), stride):
         end = min(i + stride, enc.size(1))
         ids = enc[:, i:end]
         with torch.no_grad():

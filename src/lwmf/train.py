@@ -54,6 +54,7 @@ def train(config: TrainConfig, terminal_path: str, out_dir: str) -> str:
         config.base_model, torch_dtype=torch.float16)
     model.gradient_checkpointing_enable()
     model.config.use_cache = False
+    model.enable_input_require_grads()
 
     if config.method == "lora":
         from peft import LoraConfig, get_peft_model
