@@ -35,7 +35,12 @@ def run_cell(config: TrainConfig, terminal_train: str, terminal_heldout: str,
     del m0, t0
     _free()
 
-    ckpt = os.path.join(results_dir, config.name + f"-seed{config.seed}-ckpt")
+    # Checkpoint goes to LOCAL temp disk, NOT results_dir: it's only needed
+    # transiently for eval-after, and writing ~1GB per run to the blob output
+    # would bloat storage and slow downloads across the sweep.
+    import tempfile
+    ckpt = os.path.join(tempfile.mkdtemp(prefix="lwmf-ckpt-"),
+                        config.name + f"-seed{config.seed}-ckpt")
     train(config, terminal_train, ckpt)
 
     after = run_general_eval(ckpt, tasks, eval_limit)

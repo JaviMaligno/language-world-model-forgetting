@@ -33,6 +33,12 @@ def eval_simulation(model, tokenizer, trajs, max_new_tokens: int = 128) -> dict:
     model.eval()
     for traj in trajs:
         for ex in expand_to_turns(traj):
+            # Skip no-output turns (e.g. mkdir/echo>/rm): their observation is just
+            # the exit marker, which normalize() strips to "" -> trivially matched and
+            # inflating/saturating sim_em. Score only turns with real stdout, the
+            # informative test of world-model fidelity.
+            if not normalize(ex.target):
+                continue
             ids = tokenizer.apply_chat_template(
                 ex.prefix_messages, tokenize=True, add_generation_prompt=True,
                 return_tensors="pt", return_dict=False,
