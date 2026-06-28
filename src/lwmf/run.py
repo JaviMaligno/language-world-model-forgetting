@@ -63,8 +63,11 @@ def main():
     ap.add_argument("--terminal-heldout", required=True)
     ap.add_argument("--results-dir", default="results")
     ap.add_argument("--eval-limit", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=None)
     a = ap.parse_args()
     cfg = load_config(a.config)
+    if a.seed is not None:
+        cfg.seed = a.seed
     rec = run_cell(cfg, a.terminal_train, a.terminal_heldout, a.results_dir, a.eval_limit)
     print(deltas(rec))
 
