@@ -6,20 +6,26 @@ requires-python = ">=3.11"
 # Core deps: enough to import every module and run the offline unit suite.
 # All heavy GPU-only libs live in the [gpu] extra so local (macOS, no CUDA)
 # installs don't choke on bitsandbytes.
+# Core deps: enough to import every module and run the offline unit suite.
+# Pinned to a mutually-compatible mid-2024 stack: lm-eval 0.4.4 (py3.11-friendly)
+# needs the OLD dataset-loading conventions, so datasets/huggingface_hub/transformers
+# must stay pre-2025 (newer hub rejects bare dataset ids like "hellaswag" and newer
+# datasets dropped trust_remote_code that lm-eval 0.4.4's MMLU uses). transformers 5.x
+# would force a too-new hub, so cap transformers at 4.45.
 dependencies = [
   "torch>=2.3",
-  "transformers>=4.44",
-  "datasets>=2.20",
+  "transformers>=4.44,<4.46",
+  "datasets>=2.20,<2.22",
+  "huggingface_hub>=0.23,<0.25",
   "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-# Installed only on the Azure T4 VM (training + lm-eval). bitsandbytes has no
-# macOS CUDA wheel — keep it out of the local install.
-# lm-eval pinned: newer releases adopted PEP-728 TypedDict(extra_items=) which
-# requires Python 3.13; the GPU node image is py3.11, so pin a 3.11-compatible release.
-gpu = ["trl>=0.9", "peft>=0.12", "accelerate>=0.33", "bitsandbytes>=0.43", "lm-eval==0.4.4"]
+# Installed only on the GPU node (training + lm-eval). bitsandbytes has no macOS
+# CUDA wheel — keep it out of the local install. trl is intentionally absent: the
+# trainer uses transformers.Trainer directly, not trl.SFTTrainer.
+gpu = ["peft>=0.12,<0.14", "accelerate>=0.33,<0.35", "bitsandbytes>=0.43", "lm-eval==0.4.4"]
 
 [build-system]
 requires = ["setuptools>=68"]
