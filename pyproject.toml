@@ -17,7 +17,9 @@ dependencies = [
 dev = ["pytest>=8.0"]
 # Installed only on the Azure T4 VM (training + lm-eval). bitsandbytes has no
 # macOS CUDA wheel — keep it out of the local install.
-gpu = ["trl>=0.9", "peft>=0.12", "accelerate>=0.33", "bitsandbytes>=0.43", "lm-eval>=0.4.3"]
+# lm-eval pinned: newer releases adopted PEP-728 TypedDict(extra_items=) which
+# requires Python 3.13; the GPU node image is py3.11, so pin a 3.11-compatible release.
+gpu = ["trl>=0.9", "peft>=0.12", "accelerate>=0.33", "bitsandbytes>=0.43", "lm-eval==0.4.4"]
 
 [build-system]
 requires = ["setuptools>=68"]
