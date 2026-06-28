@@ -50,8 +50,10 @@ def train(config: TrainConfig, terminal_path: str, out_dir: str) -> str:
         def __iter__(self):
             return _make_mixed()
 
-    model = AutoModelForCausalLM.from_pretrained(
-        config.base_model, torch_dtype=torch.float16)
+    # Load master weights in fp32; `fp16=True` (below) does mixed-precision via
+    # autocast + GradScaler. Loading the model itself in fp16 causes
+    # "Attempting to unscale FP16 gradients" with the Trainer's GradScaler.
+    model = AutoModelForCausalLM.from_pretrained(config.base_model)
     model.gradient_checkpointing_enable()
     model.config.use_cache = False
     model.enable_input_require_grads()
