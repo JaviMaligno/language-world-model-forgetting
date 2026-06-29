@@ -15,6 +15,21 @@ def mixed_iterator(narrow: list, replay: Iterator, ratio: float, seed: int) -> I
 
 def load_replay_stream(name: str = "HuggingFaceFW/fineweb-edu",
                        split: str = "train", text_key: str = "text") -> Iterator[str]:
+    # Offline path: if LWMF_REPLAY_FILE points to a local JSONL ({"text": ...} per
+    # line), read replay docs from it instead of streaming HF. This is what the GPU
+    # jobs use (HF_HUB_OFFLINE=1), since FineWeb-Edu can't be streamed offline.
+    import os, json
+    local = os.environ.get("LWMF_REPLAY_FILE")
+    if local:
+        with open(local, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                text = json.loads(line).get(text_key)
+                if text:
+                    yield text
+        return
     from datasets import load_dataset
     ds = load_dataset(name, split=split, streaming=True)
     for row in ds:
