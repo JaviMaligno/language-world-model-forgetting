@@ -1,10 +1,10 @@
 name: b15_control
 base_model: Qwen/Qwen2.5-1.5B-Instruct
-method: full
+method: lora
 mixing_ratio: 1.0
 lr: 5.0e-5
 max_steps: 500
-batch_size: 2
-grad_accum: 8
+batch_size: 4
+grad_accum: 4
 seed: 0
 is_instruct: true

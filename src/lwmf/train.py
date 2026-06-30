@@ -74,6 +74,12 @@ def train(config: TrainConfig, terminal_path: str, out_dir: str) -> str:
     )
     Trainer(model=model, args=args, train_dataset=StreamDS(),
             data_collator=collator).train()
+    # For LoRA, save_pretrained would write only the adapter (no model_type),
+    # which downstream eval (run_general_eval / from_pretrained on the ckpt dir)
+    # cannot load as a full model. Merge the adapter into the base first so the
+    # checkpoint is an ordinary, evaluable causal-LM.
+    if config.method == "lora":
+        model = model.merge_and_unload()
     model.save_pretrained(out_dir)
     tok.save_pretrained(out_dir)
     return out_dir
