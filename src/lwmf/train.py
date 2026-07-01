@@ -69,7 +69,7 @@ def train(config: TrainConfig, terminal_path: str, out_dir: str) -> str:
         per_device_train_batch_size=config.batch_size,
         gradient_accumulation_steps=config.grad_accum,
         learning_rate=config.lr, fp16=True,
-        optim="adamw_bnb_8bit" if config.method == "full" else "adamw_torch",
+        optim="paged_adamw_8bit" if config.method == "full" else "adamw_torch",
         logging_steps=20, save_strategy="no", report_to=[], seed=config.seed,
     )
     Trainer(model=model, args=args, train_dataset=StreamDS(),
