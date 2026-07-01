@@ -46,3 +46,42 @@ and tight across 3 seeds.
 workspace `model_server` (australiaeast); offline HF cache (model + datasets) + local
 Wikipedia replay JSONL; checkpoints to local tmp (not persisted). Per-run JSON in each job's
 `results` output; aggregates in `curve_full_summary.json`.
+
+## Phase 2 — method / flavor / size axes
+
+Same setup as Phase 1, varying one axis at a time; full test sets, 3 seeds (control 1 seed),
+mean Δ over seeds (negative = forgetting).
+
+**Mean forgetting (avg over the 4 tasks) vs mixing:**
+
+| mixing | full-FT Instruct (P1) | full-FT Base | LoRA 0.5B | LoRA 1.5B |
+|---|---|---|---|---|
+| 0%   | −0.078 | −0.077 | **+0.002** | **−0.000** |
+| 10%  | −0.021 | −0.014 | +0.005 | +0.006 |
+| 25%  | −0.012 | −0.002 | +0.009 | +0.011 |
+| 50%  | −0.015 | −0.010 | +0.009 | +0.015 |
+| 100% | −0.013 | −0.006 | +0.009 | — |
+
+sim_em (task learned) at mix0 ≈ 0.90 for every method; unchanged by method/size.
+
+**Findings.**
+1. **Base ≈ Instruct (H4).** Full-FT forgetting curves are near-identical for the base and
+   instruct 0.5B models (−0.077 vs −0.078 at mix0, same recovery). The "instruct has more to
+   lose" intuition does not hold on reasoning/commonsense tasks. (The instruct-specific loss
+   would be in instruction-following / IFEval, which is deferred — our battery can't see it.)
+2. **LoRA hides the forgetting entirely (H2) — the headline of Phase 2.** LoRA shows ≈0
+   forgetting at *every* mixing ratio, including mix0 (+0.002), while learning the task just as
+   well (sim_em 0.897). Full fine-tuning at mix0 forgets −0.078; LoRA forgets nothing. The
+   cheap/default method makes CPT *look* safe because it barely perturbs the base weights —
+   only full-FT (which actually moves the model) reveals the forgetting. Mixing is irrelevant
+   under LoRA (no forgetting to recover). This is a "measure with the wrong method → false
+   security" result.
+3. **Size, within LoRA (H3): also ≈0 at both sizes.** 1.5B-LoRA forgets ≈0 like 0.5B-LoRA, so
+   LoRA masks forgetting regardless of size. The sharper "does full-FT 1.5B forget
+   more/less than 0.5B" could **not** be tested: 1.5B full fine-tuning OOMs on the 16 GB T4
+   (params+grads+optimizer > 16 GB), so the size axis had to be run with LoRA. Honest hardware
+   limitation.
+
+**Phase-2 caveats.** 1.5B axis is LoRA-only (full-FT infeasible on T4). LoRA's slightly
+*positive* deltas (~+0.01) are within noise / minor adapter effects, not a real gain.
+Aggregates in `axes_summary.json`.
