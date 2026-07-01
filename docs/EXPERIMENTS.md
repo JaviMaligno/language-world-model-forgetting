@@ -76,12 +76,22 @@ sim_em (task learned) at mix0 ≈ 0.90 for every method; unchanged by method/siz
    only full-FT (which actually moves the model) reveals the forgetting. Mixing is irrelevant
    under LoRA (no forgetting to recover). This is a "measure with the wrong method → false
    security" result.
-3. **Size, within LoRA (H3): also ≈0 at both sizes.** 1.5B-LoRA forgets ≈0 like 0.5B-LoRA, so
-   LoRA masks forgetting regardless of size. The sharper "does full-FT 1.5B forget
-   more/less than 0.5B" could **not** be tested: 1.5B full fine-tuning OOMs on the 16 GB T4
-   (params+grads+optimizer > 16 GB), so the size axis had to be run with LoRA. Honest hardware
-   limitation.
+3. **Size (H3): larger forgets modestly less under full-FT; LoRA masks it at both sizes.**
+   Two ways in:
+   - *Within LoRA*, 1.5B and 0.5B both forget ≈0 — LoRA masks forgetting regardless of size.
+   - *Full fine-tuning* was made to fit on the 16 GB T4 (paged 8-bit optimizer offloading
+     optimizer state to CPU + `expandable_segments` + batch 1; the earlier OOM overshot by only
+     ~200 MB). **1.5B full-FT mix0 forgets a mean −0.060 ± (per-task .01–.03) vs 0.5B's −0.078**
+     — the larger model forgets **somewhat less**, weakly supporting "smaller models forget
+     more." But the effect is modest (~0.018, comparable to the seed std) and **not uniform**:
+     1.5B forgets clearly less on arc_easy (−0.083 vs −0.153) and winogrande (−0.006 vs −0.031),
+     the same on hellaswag, and slightly *more* on arc_challenge (−0.069 vs −0.048). Both learn
+     the task equally (sim_em 0.897). So the size effect is real but soft — far weaker than the
+     mixing (#1) or LoRA (H2) effects.
 
-**Phase-2 caveats.** 1.5B axis is LoRA-only (full-FT infeasible on T4). LoRA's slightly
-*positive* deltas (~+0.01) are within noise / minor adapter effects, not a real gain.
-Aggregates in `axes_summary.json`.
+   Per-seed 1.5B full-FT numbers in `dl_b15full_all/`.
+
+**Phase-2 caveats.** 1.5B mixing-sweep axis was run with LoRA; 1.5B **full-FT** was measured
+only at mix0 (the discriminating point for H3), via CPU-offloaded paged optimizer. LoRA's
+slightly *positive* deltas (~+0.01) are within noise / minor adapter effects, not a real gain.
+Aggregates in `axes_summary.json`; 1.5B full-FT in `dl_b15full_all/`.
