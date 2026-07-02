@@ -24,14 +24,18 @@ def _load_model_tok(path: str):
     return model, tok
 
 def run_cell(config: TrainConfig, terminal_train: str, terminal_heldout: str,
-             results_dir: str, eval_limit=None) -> ResultRecord:
+             results_dir: str, eval_limit=None, terminal_heldout_hard=None) -> ResultRecord:
     config.validate()
     tasks = flatten_tasks(include_instruct=config.is_instruct)
     heldout = read_jsonl(terminal_heldout)
+    heldout_hard = read_jsonl(terminal_heldout_hard) if terminal_heldout_hard else None
 
     before = run_general_eval(config.base_model, tasks, eval_limit)
     m0, t0 = _load_model_tok(config.base_model)
     sim_before = eval_simulation(m0, t0, heldout)
+    if heldout_hard is not None:
+        sim_before = {**sim_before,
+                      **{f"hard_{k}": v for k, v in eval_simulation(m0, t0, heldout_hard).items()}}
     del m0, t0
     _free()
 
@@ -46,6 +50,9 @@ def run_cell(config: TrainConfig, terminal_train: str, terminal_heldout: str,
     after = run_general_eval(ckpt, tasks, eval_limit)
     m1, t1 = _load_model_tok(ckpt)
     sim_after = eval_simulation(m1, t1, heldout)
+    if heldout_hard is not None:
+        sim_after = {**sim_after,
+                     **{f"hard_{k}": v for k, v in eval_simulation(m1, t1, heldout_hard).items()}}
     del m1, t1
     _free()
 
@@ -61,6 +68,7 @@ def main():
     ap.add_argument("--config", required=True)
     ap.add_argument("--terminal-train", required=True)
     ap.add_argument("--terminal-heldout", required=True)
+    ap.add_argument("--terminal-heldout-hard", default=None)
     ap.add_argument("--results-dir", default="results")
     ap.add_argument("--eval-limit", type=int, default=None)
     ap.add_argument("--seed", type=int, default=None)
@@ -68,7 +76,8 @@ def main():
     cfg = load_config(a.config)
     if a.seed is not None:
         cfg.seed = a.seed
-    rec = run_cell(cfg, a.terminal_train, a.terminal_heldout, a.results_dir, a.eval_limit)
+    rec = run_cell(cfg, a.terminal_train, a.terminal_heldout, a.results_dir, a.eval_limit,
+                   terminal_heldout_hard=a.terminal_heldout_hard)
     print(deltas(rec))
 
 if __name__ == "__main__":

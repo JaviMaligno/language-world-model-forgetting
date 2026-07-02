@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-# NOTE: mmlu/triviaqa/ifeval are temporarily deferred. lm-eval 0.4.4's MMLU
-# (hails/mmlu_no_train, 57 configs) is incompatible with the datasets cache here
-# ("Couldn't find cache for config ..."); triviaqa/ifeval are heavy/generative and
-# not yet validated on this stack. The validated loglikelihood-MC set below
-# reproduces Qwen's reported numbers (see baseline gate) and captures forgetting.
-# Re-add the deferred tasks once their loading is hardened.
+# NOTE: mmlu/triviaqa still deferred (lm-eval 0.4.4 MMLU cache issue). IFEval IS
+# enabled — it loads once its extra deps (langdetect, immutabledict, nltk, absl-py)
+# are installed and HF datasets are reachable/cached. IFEval measures
+# instruction-following, the capability an instruct model is expected to lose that
+# the reasoning/commonsense battery can't see.
 GENERAL_TASKS: dict[str, list[str]] = {
     "knowledge": ["arc_easy", "arc_challenge"],
     "commonsense": ["hellaswag", "winogrande"],
-    "instruct": [],
+    "instruct": ["ifeval"],
 }
 
 def flatten_tasks(include_instruct: bool) -> list[str]:

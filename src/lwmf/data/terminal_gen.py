@@ -29,13 +29,33 @@ def build_scenario(rng: random.Random) -> list[str]:
         cmds.extend(b)
     return cmds
 
+# Harder, out-of-distribution commands NOT used in build_scenario (sed/awk/grep/
+# sort/tr/cut/rev/uniq + pipes). Deterministic output. Used to build a held-out set
+# that probes generalization beyond the training distribution (does full-FT learn the
+# terminal task more deeply than LoRA?).
+def build_scenario_hard(rng: random.Random) -> list[str]:
+    word = rng.choice(["apple", "banana", "cherry", "delta"])
+    n = rng.randint(2, 3)
+    blocks: list[list[str]] = [
+        [f"printf 'c\\nb\\na\\n' | sort", f"echo {word} | tr a-z A-Z"],
+        [f"printf 'x y z\\n' | cut -d' ' -f2", f"echo {word} | rev"],
+        [f"printf 'a\\na\\nb\\n' | uniq -c", f"echo {word} | sed 's/a/X/g'"],
+        [f"printf '1 2\\n3 4\\n' | awk '{{print $2}}'", f"printf 'apple\\nbanana\\n' | grep a"],
+        [f"echo {word} | wc -c", f"printf '%s\\n%s\\n' {word} {word} | sort -u"],
+    ]
+    chosen = rng.sample(blocks, k=min(n, len(blocks)))
+    cmds: list[str] = []
+    for b in chosen:
+        cmds.extend(b)
+    return cmds
+
 def generate_trajectories(out_path: str, n_scenarios: int, seed: int,
-                          scratch_root: str) -> int:
+                          scratch_root: str, scenario_fn=build_scenario) -> int:
     rng = random.Random(seed)
     os.makedirs(scratch_root, exist_ok=True)
     trajs: list[Trajectory] = []
     for i in range(n_scenarios):
-        cmds = build_scenario(rng)
+        cmds = scenario_fn(rng)
         box = os.path.join(scratch_root, f"s{i}")
         os.makedirs(box, exist_ok=True)
         pairs = run_in_sandbox(cmds, box)
