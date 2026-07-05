@@ -69,13 +69,13 @@ sim_em (task learned) at mix0 ≈ 0.90 for every method; unchanged by method/siz
    instruct 0.5B models (−0.077 vs −0.078 at mix0, same recovery). The "instruct has more to
    lose" intuition does not hold on reasoning/commonsense tasks. (The instruct-specific loss
    would be in instruction-following / IFEval, which is deferred — our battery can't see it.)
-2. **LoRA hides the forgetting entirely (H2) — the headline of Phase 2.** LoRA shows ≈0
-   forgetting at *every* mixing ratio, including mix0 (+0.002), while learning the task just as
-   well (sim_em 0.897). Full fine-tuning at mix0 forgets −0.078; LoRA forgets nothing. The
-   cheap/default method makes CPT *look* safe because it barely perturbs the base weights —
-   only full-FT (which actually moves the model) reveals the forgetting. Mixing is irrelevant
-   under LoRA (no forgetting to recover). This is a "measure with the wrong method → false
-   security" result.
+2. **LoRA barely forgets (H2).** LoRA shows ≈0 forgetting at *every* mixing ratio, including
+   mix0 (+0.002), while learning the task just as well (sim_em 0.897). Full fine-tuning at mix0
+   forgets −0.078; LoRA forgets nothing — not because it hides a loss, but because it freezes
+   the base weights and only trains a thin adapter, leaving general knowledge untouched by
+   construction. Mixing is irrelevant under LoRA (no forgetting to recover). Phase 3 shows the
+   same pattern extends to instruction-following and OOD robustness: LoRA genuinely spares the
+   costs full-FT pays, at the usual price of learning the new task less aggressively.
 3. **Size (H3): larger forgets modestly less under full-FT; LoRA masks it at both sizes.**
    Two ways in:
    - *Within LoRA*, 1.5B and 0.5B both forget ≈0 — LoRA masks forgetting regardless of size.
@@ -95,3 +95,35 @@ sim_em (task learned) at mix0 ≈ 0.90 for every method; unchanged by method/siz
 only at mix0 (the discriminating point for H3), via CPU-offloaded paged optimizer. LoRA's
 slightly *positive* deltas (~+0.01) are within noise / minor adapter effects, not a real gain.
 Aggregates in `axes_summary.json`; 1.5B full-FT in `dl_b15full_all/`.
+
+## Phase 3 — what full-FT actually costs (method probes at mix0)
+
+Same setup, mix0, 3 seeds. Beyond the reasoning/commonsense battery, two extra probes:
+IFEval (instruction-following, generative) and held-out simulation on **out-of-distribution**
+terminal commands (`build_scenario_hard`: sed/awk/grep/sort/tr/cut/pipes — never in training).
+
+| cell | mean Δ reasoning | ΔIFEval | sim (in-dist) | sim (OOD) |
+|---|---|---|---|---|
+| instruct, full-FT | −0.086 | **−0.071** (0.194→0.123) | 0.897 | **0.00** |
+| instruct, LoRA    | ≈0 (+0.00) | **+0.033** (0.194→0.227) | 0.897 | **0.15** |
+| base, full-FT     | −0.073 | n/a (base) | 0.897 | 0.00 |
+
+**Findings.**
+1. **Full-FT degrades instruction-following (IFEval −0.071, ~37% relative); LoRA preserves it**
+   (+0.033). The reasoning/commonsense battery could not see this — it took a dedicated
+   instruction-following eval. This is the concrete capability "general benchmarks barely
+   moved" was hiding on the full-FT side.
+2. **The learned world model is more brittle under full-FT than LoRA.** Both score ~0.90 on
+   in-distribution held-out commands, but on OOD commands full-FT collapses to 0.00 while LoRA
+   still gets 0.15. Full-FT overfits the exact command shapes seen; LoRA, riding the frozen
+   base, generalizes a little. (Predicted the opposite — "LoRA learns shallower" — and was
+   wrong.)
+3. **Base vs instruct, refined:** base and instruct forget reasoning about equally; the
+   instruct model's distinctive loss is IFEval itself, which a base model has little of to
+   begin with.
+
+**Takeaway.** Full fine-tuning on a narrow task pays three costs — general reasoning,
+instruction-following, and OOD robustness of the learned task — that a single benchmark
+undersells. LoRA mostly avoids them by perturbing the model far less (frozen base weights),
+at the usual cost of learning the new task less aggressively (here immaterial: both hit 0.90).
+Per-cell aggregates in `batchA_summary.json`.
