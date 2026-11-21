@@ -1,0 +1,55 @@
+{
+  "config": {
+    "name": "p1_05Bi_mix10",
+    "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "method": "full",
+    "mixing_ratio": 0.1,
+    "lr": 5e-05,
+    "max_steps": 500,
+    "seq_len": 1024,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "seed": 2,
+    "replay_dataset": "HuggingFaceFW/fineweb-edu",
+    "is_instruct": true
+  },
+  "before": {
+    "arc_challenge": 0.30716723549488056,
+    "arc_easy": 0.6557239057239057,
+    "hellaswag": 0.40579565823541125,
+    "ifeval": 0.19408502772643252,
+    "winogrande": 0.5603788476716653
+  },
+  "after": {
+    "arc_challenge": 0.27559726962457337,
+    "arc_easy": 0.6275252525252525,
+    "hellaswag": 0.37880900219079866,
+    "ifeval": 0.12384473197781885,
+    "winogrande": 0.5524861878453039
+  },
+  "sim_before": {
+    "sim_em": 0.3464264619019492,
+    "sim_f1": 0.430934760779681,
+    "n": 3386,
+    "hard_sim_em": 0.08985943775100401,
+    "hard_sim_f1": 0.330904718875502,
+    "hard_n": 1992
+  },
+  "sim_after": {
+    "sim_em": 0.8978145304193739,
+    "sim_f1": 0.8978145304193739,
+    "n": 3386,
+    "hard_sim_em": 0.0,
+    "hard_sim_f1": 0.17659518072289157,
+    "hard_n": 1992
+  },
+  "meta": {
+    "tasks": [
+      "arc_easy",
+      "arc_challenge",
+      "hellaswag",
+      "winogrande",
+      "ifeval"
+    ]
+  }
+}

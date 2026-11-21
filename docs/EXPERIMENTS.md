@@ -127,3 +127,34 @@ instruction-following, and OOD robustness of the learned task — that a single 
 undersells. LoRA mostly avoids them by perturbing the model far less (frozen base weights),
 at the usual cost of learning the new task less aggressively (here immaterial: both hit 0.90).
 Per-cell aggregates in `batchA_summary.json`.
+
+## Phase 4 — does replay also win back instruction-following and OOD robustness?
+
+Phase 3 measured IFEval and the OOD terminal set only at mix0; Phase 1 measured replay only on the
+reasoning battery. Here: instruct 0.5B, full fine-tuning, same configs as Phase 1
+(`phase1_05B_instruct_mix{10,25}`), 3 seeds each, full test sets, IFEval + OOD hard set on every
+run. Run on Kaggle (T4 x2, kernel `kaggle/replay-probes`, ~3 h per run); the mix00 re-runs hit the
+12 h session limit, so mix0 is taken from Phase 3 (same model, same IFEval baseline 0.194, 3 seeds).
+Per-run JSON in `kaggle/replay-probes/runs/`.
+
+| mixing | n | mean Δ reasoning | ΔIFEval | IFEval after | sim (in-dist) | sim_em (OOD) | sim_f1 (OOD) |
+|---|---|---|---|---|---|---|---|
+| 0% (Phase 3) | 3 | −0.086 | −0.071 | 0.123 | 0.897 | 0.00 | — |
+| 10% | 3 | −0.022 ± .002 | **−0.079 ± .012** | 0.115 | 0.898 | 0.00 ± .00 | 0.08 ± .09 |
+| 25% | 3 | −0.009 ± .004 | **−0.079 ± .019** | 0.116 | 0.898 | 0.03 ± .05 | 0.12 ± .11 |
+
+(OOD before training: sim_em 0.090. Reasoning deltas reproduce Phase 1 — −0.021 / −0.012 —
+so the Kaggle stack matches the Azure one.)
+
+**Findings.**
+1. **Replay wins back general knowledge, not instruction-following.** 10–25% Wikipedia replay
+   recovers most of the reasoning loss, as in Phase 1, but the IFEval drop is unchanged
+   (−0.079 at both ratios vs −0.071 at mix0, within seed noise). Rehearsing encyclopedic text
+   rehearses knowledge; it does not rehearse following instructions.
+2. **Replay does not fix OOD brittleness either.** The learned simulator still collapses on
+   unseen command shapes (sim_em ≈0; one mix25 seed reached 0.08). Only LoRA (0.15, Phase 3)
+   kept some OOD skill.
+
+**Takeaway.** Replay is a fix for the cost you measure with general benchmarks, not for all three.
+To protect instruction-following under full FT you would have to replay instruction data
+(untested here) or use LoRA.
